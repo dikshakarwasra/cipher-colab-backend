@@ -19,8 +19,8 @@ class Settings(BaseSettings):
         default="L9bbQxAM0OaeU39b-P_yL7hDbyQazdUTJxXqdQ9uXyA=",
         alias="AES_GCM_KEY",
     )
-    cors_origins: list[str] = Field(default=["http://localhost:3000"], alias="CORS_ORIGINS")
-    frontend_url: str = Field(default="http://localhost:3000", alias="FRONTEND_URL")
+    cors_origins: list[str] = Field(default=["*"], alias="CORS_ORIGINS")
+    frontend_url: str = Field(default="http://localhost:5000", alias="FRONTEND_URL")
     access_token_minutes: int = 30
     refresh_token_days: int = 14
 
@@ -32,8 +32,6 @@ class Settings(BaseSettings):
                 return list(json.loads(value))
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
-
-    # FIXED: accepts JSON or comma-separated CORS origins from production env files
 
 
 @lru_cache
