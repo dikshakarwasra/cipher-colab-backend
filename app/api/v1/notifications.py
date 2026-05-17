@@ -35,3 +35,16 @@ async def mark_read(
         .values(is_read=True)
     )
     return {"success": True}
+
+
+@router.post("/read-all")
+async def mark_all_read(
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, bool]:
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user.id, Notification.is_read.is_(False))
+        .values(is_read=True)
+    )
+    return {"success": True}
