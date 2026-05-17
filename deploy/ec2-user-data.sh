@@ -63,7 +63,8 @@ python3 -m venv "$BACKEND_DIR/.venv"
 "$BACKEND_DIR/.venv/bin/python" -m pip install --upgrade pip
 "$BACKEND_DIR/.venv/bin/python" -m pip install -r "$BACKEND_DIR/requirements.txt"
 cd "$BACKEND_DIR"
-"$BACKEND_DIR/.venv/bin/alembic" upgrade head || true
+"$BACKEND_DIR/.venv/bin/python" -m alembic upgrade head || true
+"$BACKEND_DIR/.venv/bin/python" -c "from app.main import app; print(app.title)"
 
 cat > /etc/systemd/system/cipher-colab-backend.service <<EOF
 [Unit]
@@ -87,6 +88,17 @@ EOF
 systemctl daemon-reload
 systemctl enable cipher-colab-backend
 systemctl restart cipher-colab-backend
+
+for attempt in $(seq 1 20); do
+  if curl -fsS http://127.0.0.1:5000/health >/tmp/cipher-colab-health.json; then
+    break
+  fi
+  sleep 2
+done
+
+if ! curl -fsS http://127.0.0.1:5000/health >/dev/null; then
+  journalctl -u cipher-colab-backend -n 120 --no-pager || true
+fi
 
 cd "$FRONTEND_DIR"
 if [ -f package-lock.json ]; then
@@ -148,5 +160,4 @@ fi
 systemctl reload nginx
 systemctl status cipher-colab-backend --no-pager || true
 
-# FIXED: added idempotent EC2 bootstrap for split frontend/backend repos
-
+# FIXED: keeps CORS origins JSON-compatible for pydantic-settings
