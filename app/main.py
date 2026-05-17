@@ -22,7 +22,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Cipher Collab API",
-    version="2.0.0",
+    version="2.1.0",
     description="Secure real-time collaboration backend for Cipher Collab.",
     lifespan=lifespan,
 )
@@ -40,7 +40,12 @@ app.include_router(api_router)
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "api": "fastapi", "websocket": "/ws/workspaces/{workspace_id}"}
+    return {
+        "status": "ok",
+        "api": "fastapi",
+        "version": "2.1.0",
+        "websocket": "/ws/workspaces/{workspace_id}",
+    }
 
 
 async def websocket_user(token: str) -> User | None:
@@ -81,9 +86,30 @@ async def workspace_socket(websocket: WebSocket, workspace_id: str, token: str):
             payload = json.loads(raw)
             payload.setdefault("user", user_payload)
             payload.setdefault("workspaceId", workspace_id)
-            if payload.get("type") in {"yjs_update", "cursor_update", "typing", "intent_change", "chat_message", "file_saved"}:
+
+            msg_type = payload.get("type")
+
+            if msg_type == "intent_change" and payload.get("intent"):
+                manager.set_user_intent(websocket, payload["intent"])
                 await manager.broadcast(workspace_id, payload, exclude=websocket)
+
+            elif msg_type in {
+                "yjs_update",
+                "cursor_update",
+                "typing",
+                "chat_message",
+                "file_saved",
+                "file_locked",
+                "file_unlocked",
+                "workspace_frozen",
+            }:
+                await manager.broadcast(workspace_id, payload, exclude=websocket)
+
+            elif msg_type == "ping":
+                await websocket.send_json({"type": "pong"})
+
             else:
                 await websocket.send_json({"type": "error", "message": "Unsupported websocket event"})
+
     except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
         await manager.disconnect(workspace_id, websocket)
