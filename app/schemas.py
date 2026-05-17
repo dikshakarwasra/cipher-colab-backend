@@ -63,6 +63,16 @@ class MemberPublic(BaseModel):
     muted_chat: bool = False
 
 
+class MemberPublicWithStatus(BaseModel):
+    user_id: int
+    username: str
+    display_name: str
+    role: WorkspaceRole
+    muted_chat: bool = False
+    is_online: bool = False
+    current_intent: str | None = None
+
+
 class JoinRoomRequest(BaseModel):
     room_id: str
     requested_role: WorkspaceRole = WorkspaceRole.editor
@@ -169,3 +179,25 @@ class LockRequest(BaseModel):
 
 class FreezeRequest(BaseModel):
     frozen: bool = True
+
+
+class MuteRequest(BaseModel):
+    muted: bool = True
+
+
+class InviteRequest(BaseModel):
+    username: str
+    role: WorkspaceRole = WorkspaceRole.editor
+
+
+class IntentSummary(BaseModel):
+    intent: str
+    count: int
+
+
+class PresencePublic(BaseModel):
+    user_id: int
+    username: str
+    display_name: str
+    role: str
+    current_intent: str | None = None
