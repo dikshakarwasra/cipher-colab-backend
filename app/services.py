@@ -183,7 +183,60 @@ def workspace_query_for_user(user_id: int) -> Select[tuple[Workspace]]:
     )
 
 
-async def create_workspace_with_seed(db: AsyncSession, owner: User, name: str, description: str | None, template: str) -> Workspace:
+# Seed file templates per workspace template type
+TEMPLATE_SEEDS: dict[str, list[dict]] = {
+    "python": [
+        {"name": "app.py", "path": "app.py", "language": "python",
+         "content": 'from flask import Flask, request, jsonify\nfrom utils.db import get_db\n\napp = Flask(__name__)\n\n\n@app.route(\'/api/hello\', methods=[\'GET\'])\ndef hello():\n    return jsonify({"message": "Hello from Cipher Collab!"})\n\n\n@app.route(\'/api/user\', methods=[\'POST\'])\ndef create_user():\n    data = request.json\n    db = get_db()\n    user = db.users.insert_one(data)\n    return jsonify({"id": str(user.inserted_id), "status": "created"})\n\n\n@app.route(\'/api/users\', methods=[\'GET\'])\ndef get_users():\n    db = get_db()\n    users = list(db.users.find({}, {"_id": 0}))\n    return jsonify(users)\n'},
+        {"name": "config.py", "path": "config.py", "language": "python",
+         "content": 'import os\n\nDATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./dev.db")\nSECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")\nDEBUG = os.getenv("DEBUG", "true").lower() == "true"\n'},
+        {"name": "requirements.txt", "path": "requirements.txt", "language": "plaintext",
+         "content": 'flask>=3.0.0\npymongo>=4.6.0\npython-dotenv>=1.0.0\ngunicorn>=21.2.0\n'},
+        {"name": "README.md", "path": "README.md", "language": "markdown",
+         "content": '# Cipher Collab Python Backend\n\nA collaborative Python backend project.\n\n## Setup\n\n```bash\npip install -r requirements.txt\npython app.py\n```\n\n## API Endpoints\n\n- `GET /api/hello` – Health check\n- `POST /api/user` – Create user\n- `GET /api/users` – List users\n'},
+        {"name": "auth.js", "path": "backend/routes/auth.js", "language": "javascript",
+         "content": 'const express = require(\'express\');\nconst router = express.Router();\n\nrouter.post(\'/login\', async (req, res) => {\n  const { username, password } = req.body;\n  // TODO: validate credentials\n  res.json({ token: \'jwt-token-here\' });\n});\n\nmodule.exports = router;\n'},
+        {"name": "user.js", "path": "backend/routes/user.js", "language": "javascript",
+         "content": 'const express = require(\'express\');\nconst router = express.Router();\n\nrouter.get(\'/\', async (req, res) => {\n  const users = await User.find();\n  res.json(users);\n});\n\nrouter.post(\'/\', async (req, res) => {\n  const user = new User(req.body);\n  await user.save();\n  res.status(201).json(user);\n});\n\nmodule.exports = router;\n'},
+        {"name": "project.js", "path": "backend/routes/project.js", "language": "javascript",
+         "content": 'const express = require(\'express\');\nconst router = express.Router();\n\nrouter.get(\'/\', async (req, res) => {\n  const projects = await Project.find({ owner: req.user.id });\n  res.json(projects);\n});\n\nmodule.exports = router;\n'},
+        {"name": "userModel.js", "path": "backend/models/userModel.js", "language": "javascript",
+         "content": 'const mongoose = require(\'mongoose\');\n\nconst userSchema = new mongoose.Schema({\n  username: { type: String, required: true, unique: true },\n  email: { type: String, required: true, unique: true },\n  password: { type: String, required: true },\n  createdAt: { type: Date, default: Date.now },\n});\n\nmodule.exports = mongoose.model(\'User\', userSchema);\n'},
+        {"name": "projectModel.js", "path": "backend/models/projectModel.js", "language": "javascript",
+         "content": 'const mongoose = require(\'mongoose\');\n\nconst projectSchema = new mongoose.Schema({\n  name: { type: String, required: true },\n  owner: { type: mongoose.Schema.Types.ObjectId, ref: \'User\' },\n  files: [{ type: String }],\n  createdAt: { type: Date, default: Date.now },\n});\n\nmodule.exports = mongoose.model(\'Project\', projectSchema);\n'},
+        {"name": "helper.js", "path": "backend/utils/helper.js", "language": "javascript",
+         "content": 'exports.formatError = (message, code = 400) => ({ error: message, code });\nexports.paginate = (query, page = 1, limit = 20) => query.skip((page - 1) * limit).limit(limit);\n'},
+        {"name": "db.js", "path": "backend/utils/db.js", "language": "javascript",
+         "content": 'const mongoose = require(\'mongoose\');\n\nlet _db;\n\nexports.connect = async () => {\n  _db = await mongoose.connect(process.env.MONGO_URI);\n  console.log(\'DB connected\');\n};\n\nexports.get_db = () => _db;\n'},
+        {"name": "index.ts", "path": "frontend/index.ts", "language": "typescript",
+         "content": 'import { createApp } from \'./app\';\n\nconst app = createApp();\n\napp.listen(3000, () => {\n  console.log(\'Frontend server running on port 3000\');\n});\n'},
+        {"name": ".gitignore", "path": ".gitignore", "language": "plaintext",
+         "content": '__pycache__/\n*.pyc\n.env\nnode_modules/\ndist/\n.DS_Store\n*.log\n'},
+        {"name": "Dockerfile", "path": "Dockerfile", "language": "dockerfile",
+         "content": 'FROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\nEXPOSE 5000\nCMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]\n'},
+    ],
+    "node": [
+        {"name": "index.ts", "path": "src/index.ts", "language": "typescript",
+         "content": 'import express from \'express\';\n\nconst app = express();\napp.use(express.json());\n\napp.get(\'/\', (_req, res) => res.json({ message: \'Hello from Cipher Collab\' }));\n\napp.listen(3000, () => console.log(\'Server running on port 3000\'));\n'},
+        {"name": "README.md", "path": "README.md", "language": "markdown",
+         "content": '# Cipher Collab Node Backend\n\n```bash\nnpm install\nnpm run dev\n```\n'},
+    ],
+    "empty": [
+        {"name": "index.ts", "path": "src/index.ts", "language": "typescript",
+         "content": '// Cipher Collab Workspace\n// Start collaborating!\n\nconsole.log("Hello from Cipher Collab");\n'},
+        {"name": "README.md", "path": "README.md", "language": "markdown",
+         "content": '# New Workspace\n\nWelcome to your new Cipher Collab workspace.\n'},
+    ],
+}
+
+
+async def create_workspace_with_seed(
+    db: AsyncSession,
+    owner: User,
+    name: str,
+    description: str | None,
+    template: str,
+) -> Workspace:
     workspace = Workspace(
         id=new_id("wrk"),
         room_id=room_id(),
@@ -195,28 +248,32 @@ async def create_workspace_with_seed(db: AsyncSession, owner: User, name: str, d
     db.add(workspace)
     await db.flush()
     db.add(WorkspaceMember(workspace_id=workspace.id, user_id=owner.id, role=WorkspaceRole.admin))
-    seed = WorkspaceFile(
-        id=new_id("fil"),
-        workspace_id=workspace.id,
-        name="app.py" if template == "python" else "index.ts",
-        path="app.py" if template == "python" else "src/index.ts",
-        language="python" if template == "python" else "typescript",
-        content='print("Hello from Cipher Collab")\n' if template == "python" else 'console.log("Hello from Cipher Collab");\n',
-        created_by=owner.id,
-    )
-    db.add(seed)
-    await db.flush()
-    db.add(
-        FileVersion(
-            id=new_id("ver"),
-            file_id=seed.id,
+
+    seeds = TEMPLATE_SEEDS.get(template, TEMPLATE_SEEDS["empty"])
+    for seed_data in seeds:
+        file = WorkspaceFile(
+            id=new_id("fil"),
             workspace_id=workspace.id,
-            version_number=1,
-            content=seed.content,
+            name=seed_data["name"],
+            path=seed_data["path"],
+            language=seed_data["language"],
+            content=seed_data["content"],
             created_by=owner.id,
-            message="Initial version",
         )
-    )
+        db.add(file)
+        await db.flush()
+        db.add(
+            FileVersion(
+                id=new_id("ver"),
+                file_id=file.id,
+                workspace_id=workspace.id,
+                version_number=1,
+                content=file.content,
+                created_by=owner.id,
+                message="Initial version",
+            )
+        )
+
     await log_activity(db, workspace.id, "workspace_created", owner.id, details={"name": name})
     return workspace
 
