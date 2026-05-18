@@ -11,7 +11,7 @@ from app.core.database import get_db
 from app.core.security import CurrentUser
 from app.models import RefreshSession, User
 from app.schemas import LoginRequest, RefreshRequest, SignupRequest, TokenResponse, UserPublic
-from app.services import authenticate, create_user, issue_tokens, log_security, token_hash
+from app.services import authenticate, create_user, issue_tokens, log_security, now_utc, token_hash
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -63,6 +63,7 @@ async def refresh(
             RefreshSession.user_id == user_id,
             RefreshSession.token_hash == token_hash(payload.refresh_token),
             RefreshSession.revoked_at.is_(None),
+            RefreshSession.expires_at > now_utc(),
         )
     )
     session = result.scalar_one_or_none()
@@ -74,7 +75,7 @@ async def refresh(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
     await log_security(db, "refresh_success", request, user.id)
     access, refresh_token = await issue_tokens(db, user, request)
-    session.revoked_at = datetime.utcnow()
+    session.revoked_at = now_utc()
     return TokenResponse(access_token=access, refresh_token=refresh_token, user=UserPublic.model_validate(user))
 
 
@@ -92,7 +93,7 @@ async def logout(
     await db.execute(
         update(RefreshSession)
         .where(RefreshSession.user_id == user.id, RefreshSession.token_hash == token_hash(payload.refresh_token))
-        .values(revoked_at=datetime.utcnow())
+        .values(revoked_at=now_utc())
     )
     return {"success": True}
 
@@ -102,6 +103,6 @@ async def logout_all(user: CurrentUser, db: Annotated[AsyncSession, Depends(get_
     await db.execute(
         update(RefreshSession)
         .where(RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None))
-        .values(revoked_at=datetime.utcnow())
+        .values(revoked_at=now_utc())
     )
     return {"success": True}

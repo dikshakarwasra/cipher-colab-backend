@@ -9,6 +9,7 @@ from app.core.security import CurrentUser
 from app.models import ChatMessage, WorkspaceMember, WorkspaceRole
 from app.schemas import ChatCreate, ChatPublic
 from app.services import log_activity, new_id, require_workspace_role
+from app.websocket_manager import manager
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/chat", tags=["chat"])
 
@@ -49,5 +50,11 @@ async def send_message(
         intent=payload.intent,
     )
     db.add(message)
+    await db.flush()
+    await db.refresh(message)
+
+    chat_payload = ChatPublic.model_validate(message).model_dump(mode="json")
+    await manager.broadcast(workspace_id, {"type": "chat_message", **chat_payload})
+
     await log_activity(db, workspace_id, "chat_message", user.id, payload.intent)
     return ChatPublic.model_validate(message)

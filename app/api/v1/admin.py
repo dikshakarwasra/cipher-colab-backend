@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.security import CurrentUser
 from app.models import JoinRequest, User, WorkspaceFile, WorkspaceMember, WorkspaceRole
 from app.schemas import FreezeRequest, InviteRequest, LockRequest, MuteRequest, RoleUpdate
-from app.services import log_activity, new_id, notify_user, require_workspace_role, set_workspace_frozen
+from app.services import log_activity, new_id, notify_user, now_utc, require_workspace_role, set_workspace_frozen
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/admin", tags=["admin"])
 
@@ -50,7 +50,7 @@ async def approve_join(
     if not request or request.workspace_id != workspace_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Join request not found")
     request.status = "approved"
-    request.decided_at = datetime.utcnow()
+    request.decided_at = now_utc()
     db.add(WorkspaceMember(workspace_id=workspace_id, user_id=request.user_id, role=request.requested_role))
     await notify_user(db, request.user_id, "Access granted", "An admin approved your workspace request", "access_granted", workspace_id)
     await log_activity(db, workspace_id, "join_approved", user.id, details={"requestId": request_id})
@@ -69,7 +69,7 @@ async def reject_join(
     if not request or request.workspace_id != workspace_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Join request not found")
     request.status = "rejected"
-    request.decided_at = datetime.utcnow()
+    request.decided_at = now_utc()
     await notify_user(db, request.user_id, "Access denied", "An admin rejected your workspace request", "access_denied", workspace_id)
     await log_activity(db, workspace_id, "join_rejected", user.id, details={"requestId": request_id})
     return {"success": True}

@@ -29,7 +29,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=[str(origin) for origin in settings.cors_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,12 +84,16 @@ async def workspace_socket(websocket: WebSocket, workspace_id: str, token: str):
         while True:
             raw = await websocket.receive_text()
             payload = json.loads(raw)
+
+            if not isinstance(payload, dict):
+                continue
+
             payload.setdefault("user", user_payload)
             payload.setdefault("workspaceId", workspace_id)
 
             msg_type = payload.get("type")
 
-            if msg_type == "intent_change" and payload.get("intent"):
+            if msg_type == "intent_change" and "intent" in payload:
                 manager.set_user_intent(websocket, payload["intent"])
                 await manager.broadcast(workspace_id, payload, exclude=websocket)
 
@@ -99,7 +103,7 @@ async def workspace_socket(websocket: WebSocket, workspace_id: str, token: str):
 
             elif msg_type == "user_status_update":
                 # Update and broadcast member status changes
-                if payload.get("intent"):
+                if "intent" in payload:
                     manager.set_user_intent(websocket, payload["intent"])
                 await manager.broadcast(workspace_id, payload, exclude=websocket)
 

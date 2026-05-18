@@ -26,17 +26,25 @@ class ConnectionManager:
             await self.broadcast(workspace_id, {"type": "user_left", "user": user})
 
     async def broadcast(self, workspace_id: str, payload: dict, exclude: WebSocket | None = None) -> None:
-        message = json.dumps(payload, default=str)
+        # Use a more robust serializer for Enums and other types
+        def serializer(obj):
+            if hasattr(obj, "value"):
+                return obj.value
+            return str(obj)
+
+        message = json.dumps(payload, default=serializer)
         stale: list[WebSocket] = []
         for socket in list(self.rooms.get(workspace_id, set())):
             if socket is exclude:
                 continue
             try:
                 await socket.send_text(message)
-            except RuntimeError:
+            except (RuntimeError, Exception):
                 stale.append(socket)
         for socket in stale:
             self.rooms[workspace_id].discard(socket)
+            self.users.pop(socket, None)
+            self.user_intents.pop(socket, None)
 
     def get_online_user_ids(self, workspace_id: str) -> list[int]:
         ids: list[int] = []

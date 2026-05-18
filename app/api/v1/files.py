@@ -9,6 +9,7 @@ from app.core.security import CurrentUser
 from app.models import CodeChange, Intent, Workspace, WorkspaceFile, WorkspaceRole
 from app.schemas import FileCreate, FilePublic, FileUpdate, VersionPublic
 from app.services import create_version, log_activity, new_id, now_utc, require_workspace_role
+from app.websocket_manager import manager
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/files", tags=["files"])
 
@@ -43,6 +44,10 @@ async def create_file(
     )
     db.add(file)
     await db.flush()
+    await db.refresh(file)
+
+    await manager.broadcast(workspace_id, {"type": "file_created", "file": FilePublic.model_validate(file).model_dump(mode="json")})
+
     await create_version(db, file, user.id, "Initial version")
     await log_activity(db, workspace_id, "file_created", user.id, file_id=file.id, details={"path": file.path})
     return FilePublic.model_validate(file)
@@ -95,6 +100,16 @@ async def update_file(
         summary=payload.summary,
     )
     db.add(change)
+    await db.flush()
+
+    await manager.broadcast(workspace_id, {
+        "type": "file_updated",
+        "fileId": file.id,
+        "content": file.content,
+        "intent": payload.intent.value if hasattr(payload.intent, "value") else payload.intent,
+        "user_id": user.id,
+    })
+
     await create_version(db, file, user.id, payload.summary or f"{payload.intent.value} update")
     await log_activity(db, workspace_id, "file_updated", user.id, payload.intent, file.id)
     return FilePublic.model_validate(file)
