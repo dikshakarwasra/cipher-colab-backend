@@ -59,6 +59,7 @@ cat > "$FRONTEND_DIR/.env" <<EOF
 VITE_API_BASE_URL=/api/v1
 VITE_WS_BASE_URL=wss://${APP_DOMAIN}/ws
 EOF
+cp "$FRONTEND_DIR/.env" "$FRONTEND_DIR/client/.env"
 
 python3 -m venv "$BACKEND_DIR/.venv"
 "$BACKEND_DIR/.venv/bin/python" -m pip install --upgrade pip
@@ -151,6 +152,7 @@ EOF
 
 ln -sfn /etc/nginx/sites-available/cipher-colab /etc/nginx/sites-enabled/cipher-colab
 rm -f /etc/nginx/sites-enabled/default
+printf 'server_names_hash_bucket_size 128;\n' > /etc/nginx/conf.d/server_names_hash_bucket_size.conf
 nginx -t
 systemctl reload nginx
 
