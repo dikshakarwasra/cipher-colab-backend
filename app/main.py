@@ -93,6 +93,16 @@ async def workspace_socket(websocket: WebSocket, workspace_id: str, token: str):
                 manager.set_user_intent(websocket, payload["intent"])
                 await manager.broadcast(workspace_id, payload, exclude=websocket)
 
+            elif msg_type == "intent_range":
+                # Broadcast live editing range to other users
+                await manager.broadcast(workspace_id, payload, exclude=websocket)
+
+            elif msg_type == "user_status_update":
+                # Update and broadcast member status changes
+                if payload.get("intent"):
+                    manager.set_user_intent(websocket, payload["intent"])
+                await manager.broadcast(workspace_id, payload, exclude=websocket)
+
             elif msg_type in {
                 "yjs_update",
                 "cursor_update",
@@ -102,6 +112,7 @@ async def workspace_socket(websocket: WebSocket, workspace_id: str, token: str):
                 "file_locked",
                 "file_unlocked",
                 "workspace_frozen",
+                "notification",
             }:
                 await manager.broadcast(workspace_id, payload, exclude=websocket)
 
