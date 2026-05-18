@@ -33,6 +33,15 @@ async def create_file(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> FilePublic:
     await require_workspace_role(db, workspace_id, user.id, WorkspaceRole.editor)
+    existing = await db.execute(
+        select(WorkspaceFile).where(
+            WorkspaceFile.workspace_id == workspace_id,
+            WorkspaceFile.path == payload.path,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status.HTTP_409_CONFLICT, "A file with this path already exists")
+
     file = WorkspaceFile(
         id=new_id("fil"),
         workspace_id=workspace_id,

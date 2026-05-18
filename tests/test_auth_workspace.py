@@ -41,6 +41,18 @@ async def test_signup_create_workspace_and_file_flow():
         assert len(files.json()) >= 1
 
         file_id = files.json()[0]["id"]
+        duplicate = await client.post(
+            f"/api/v1/workspaces/{workspace_id}/files",
+            json={
+                "name": files.json()[0]["name"],
+                "path": files.json()[0]["path"],
+                "language": files.json()[0]["language"],
+                "content": "",
+            },
+            headers=headers,
+        )
+        assert duplicate.status_code == 409
+
         update = await client.put(
             f"/api/v1/workspaces/{workspace_id}/files/{file_id}",
             json={
