@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DOMAIN="cipher-collab.duckdns.org"
+APP_DOMAIN="${APP_DOMAIN:-cipher-collab.duckdns.org}"
+LEGACY_SERVER_NAME="${LEGACY_SERVER_NAME:-ec2-16-171-161-189.eu-north-1.compute.amazonaws.com}"
 BACKEND_REPO="https://github.com/dikshakarwasra/cipher-colab-backend.git"
 FRONTEND_REPO="https://github.com/dikshakarwasra/cipher-colab-frontend.git"
 BACKEND_DIR="/app/backend"
 FRONTEND_DIR="/app/frontend"
-DUCKDNS_DOMAIN="cipher-collab"
-DUCKDNS_TOKEN="REPLACE_WITH_DUCKDNS_TOKEN"
+DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN:-cipher-collab}"
+DUCKDNS_TOKEN="${DUCKDNS_TOKEN:-REPLACE_WITH_DUCKDNS_TOKEN}"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -139,6 +140,12 @@ server {
     location / {
         try_files \$uri \$uri/ /index.html;
     }
+}
+
+server {
+    listen 80 default_server;
+    server_name ${LEGACY_SERVER_NAME} _;
+    return 301 https://${APP_DOMAIN}\$request_uri;
 }
 EOF
 
