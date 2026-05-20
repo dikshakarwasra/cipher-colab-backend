@@ -96,19 +96,20 @@ async def update_file(
     previous = file.content
     file.content = payload.content
     file.updated_at = now_utc()
-    change = CodeChange(
-        id=new_id("chg"),
-        file_id=file.id,
-        workspace_id=workspace_id,
-        user_id=user.id,
-        intent=payload.intent,
-        line_start=payload.line_start,
-        line_end=payload.line_end,
-        previous_content=previous,
-        content=payload.content,
-        summary=payload.summary,
-    )
-    db.add(change)
+    if payload.intent is not None:
+        change = CodeChange(
+            id=new_id("chg"),
+            file_id=file.id,
+            workspace_id=workspace_id,
+            user_id=user.id,
+            intent=payload.intent,
+            line_start=payload.line_start,
+            line_end=payload.line_end,
+            previous_content=previous,
+            content=payload.content,
+            summary=payload.summary,
+        )
+        db.add(change)
     await db.flush()
 
     await manager.broadcast(workspace_id, {
@@ -119,7 +120,7 @@ async def update_file(
         "user_id": user.id,
     })
 
-    await create_version(db, file, user.id, payload.summary or f"{payload.intent.value} update")
+    await create_version(db, file, user.id, payload.summary or (f"{payload.intent.value} update" if payload.intent else "Neutral update"))
     await log_activity(db, workspace_id, "file_updated", user.id, payload.intent, file.id)
     return FilePublic.model_validate(file)
 

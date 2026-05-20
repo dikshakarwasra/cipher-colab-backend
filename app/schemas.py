@@ -93,7 +93,7 @@ class FileCreate(BaseModel):
 
 class FileUpdate(BaseModel):
     content: str
-    intent: Intent
+    intent: Intent | None = None
     line_start: int = 1
     line_end: int = 1
     summary: str | None = None

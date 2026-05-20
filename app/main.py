@@ -116,6 +116,7 @@ async def workspace_socket(websocket: WebSocket, workspace_id: str, token: str):
                 "file_locked",
                 "file_unlocked",
                 "workspace_frozen",
+                "workspace_unfrozen",
                 "notification",
             }:
                 await manager.broadcast(workspace_id, payload, exclude=websocket)

@@ -14,7 +14,7 @@ class ConnectionManager:
         await websocket.accept()
         self.rooms[workspace_id].add(websocket)
         self.users[websocket] = {**user, "workspace_id": workspace_id}
-        await self.broadcast(workspace_id, {"type": "user_joined", "user": user})
+        await self.broadcast(workspace_id, {"type": "user_joined", "user": user}, exclude=websocket)
         online = self.get_online_user_ids(workspace_id)
         await websocket.send_json({"type": "presence_sync", "online_user_ids": online})
 
